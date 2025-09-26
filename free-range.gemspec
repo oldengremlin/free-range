@@ -1,0 +1,16 @@
+Gem::Specification.new do |s|
+  s.name        = 'free-range'
+  s.version     = '0.1.0'
+  s.summary     = 'VLAN distribution analysis tool'
+  s.description = 'A Ruby script to analyze VLAN distribution on network devices, generating tables or PNG images.'
+  s.authors     = ['Oleksandr Russkikh //aka Olden Gremlin']
+  s.email       = 'olden@ukr-com.net'
+  s.files       = Dir['lib/**/*', 'bin/**/*']
+  s.executables = ['free-range']
+  s.homepage    = 'https://github.com/yourusername/free-range' # Опціонально, якщо є репозиторій
+  s.license     = 'MIT'
+
+  s.add_dependency 'rmagick', '~> 5.3'
+  s.add_development_dependency 'bundler', '~> 2.0'
+  s.add_development_dependency 'rake', '~> 13.0'
+end

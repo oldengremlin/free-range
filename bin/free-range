@@ -1,0 +1,7 @@
+#!/usr/bin/env ruby
+require 'free_range'
+
+# Виклик основної логіки, якщо потрібно (зазвичай код уже запускається в
+lib/free_range.rb)
+
+FreeRange.main if defined?(FreeRange.main)
