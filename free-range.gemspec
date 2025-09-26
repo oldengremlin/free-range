@@ -7,8 +7,8 @@ Gem::Specification.new do |s|
   s.email       = 'olden@ukr-com.net'
   s.files       = Dir['lib/**/*', 'bin/**/*']
   s.executables = ['free-range']
-  s.homepage    = 'https://github.com/yourusername/free-range' # Опціонально, якщо є репозиторій
-  s.license     = 'MIT'
+  s.homepage    = 'https://github.com/oldengremlin/free-range'
+  s.license     = 'Apache-2.0'
 
   s.add_dependency 'rmagick', '~> 5.3'
   s.add_development_dependency 'bundler', '~> 2.0'
