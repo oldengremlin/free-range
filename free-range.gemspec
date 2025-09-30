@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
   s.name        = 'free-range'
-  s.version     = '0.2.1'
+  s.version     = '0.2.3'
   s.summary     = 'VLAN distribution analysis tool'
   s.description = 'A Ruby script to analyze VLAN distribution on network devices, generating tables or PNG images.'
   s.authors     = ['Oleksandr Russkikh //aka Olden Gremlin']

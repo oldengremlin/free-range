@@ -2,7 +2,10 @@ require 'optparse'
 require 'rmagick'
 require 'fileutils'
 
-module FreeRange
+class FreeRange
+  # Змінні екземпляра для статичних параметрів
+  attr_reader :config, :subscribers_result, :target, :use_color, :debug, :table_mode, :table_png_mode
+
   # Перевірка наявності ImageMagick
   begin
     require 'rmagick'
@@ -465,14 +468,12 @@ module FreeRange
   end
 
   # Метод для заповнення Ranges для одного інтерфейсу
-  # @param config [Config] Configuration object with commands
   # @param interface [String, nil] Interface name or nil for all interfaces
   # @param ranges [Ranges] Object to store VLAN ranges
-  # @param debug [Boolean] Enable debug output
   # @return [void]
-  def self.process_interface(config, interface, ranges, debug = false)
-    full_cmd = "#{config.ssh_command} '#{config.command_ranges(interface)}'"
-    puts "[DEBUG] Executing command: #{full_cmd}" if debug
+  def process_interface(interface, ranges)
+    full_cmd = "#{@config.ssh_command} '#{@config.command_ranges(interface)}'"
+    puts "[DEBUG] Executing command: #{full_cmd}" if @debug
     result = `#{full_cmd}`.strip
     unless result.empty?
       result.each_line do |line|
@@ -484,8 +485,8 @@ module FreeRange
       end
     end
 
-    full_cmd = "#{config.ssh_command} '#{config.command_demux(interface)}'"
-    puts "[DEBUG] Executing command: #{full_cmd}" if debug
+    full_cmd = "#{@config.ssh_command} '#{@config.command_demux(interface)}'"
+    puts "[DEBUG] Executing command: #{full_cmd}" if @debug
     result = `#{full_cmd}`.strip
     unless result.empty?
       result.each_line do |line|
@@ -499,8 +500,8 @@ module FreeRange
       end
     end
 
-    full_cmd = "#{config.ssh_command} '#{config.command_another(interface)}'"
-    puts "[DEBUG] Executing command: #{full_cmd}" if debug
+    full_cmd = "#{@config.ssh_command} '#{@config.command_another(interface)}'"
+    puts "[DEBUG] Executing command: #{full_cmd}" if @debug
     result = `#{full_cmd}`.strip
     unless result.empty?
       result.each_line do |line|
@@ -516,20 +517,13 @@ module FreeRange
   end
 
   # Обробляє VLAN для інтерфейсу та виводить результати
-  # @param config [Config] Configuration object with commands
   # @param interface [String, nil] Interface name or nil for all interfaces
-  # @param subscribers_result [String] Result of subscribers command
-  # @param target [String] Target device hostname
-  # @param use_color [Boolean] Enable colored output
-  # @param debug [Boolean] Enable debug output
-  # @param table_mode [Boolean] Display VLAN distribution table
-  # @param table_png_mode [String, nil] Path to save PNG or nil
   # @return [void]
-  def self.process_and_output(config, interface, subscribers_result, target, use_color, debug, table_mode, table_png_mode)
+  def process_and_output(interface)
     ranges = Ranges.new
     vlans = Vlans.new
-    subscribers_result.each_line do |line|
-      if line.split.first =~ /dhcp(?:_[0-9a-fA-F.]+)?_([^:]+):(\d+)@#{Regexp.escape(target)}$/
+    @subscribers_result.each_line do |line|
+      if line.split.first =~ /dhcp(?:_[0-9a-fA-F.]+)?_([^:]+):(\d+)@#{Regexp.escape(@target)}$/
         subscriber_interface, vlan = $1, $2.to_i
         if interface
           vlans.add_vlan(vlan) if subscriber_interface == interface && vlan > 0
@@ -539,26 +533,33 @@ module FreeRange
       end
     end
 
-    process_interface(config, interface, ranges, debug)
-    if debug
+    process_interface(interface, ranges)
+    if @debug
       puts "\nІнтерфейс: #{interface}" if interface
       Print.ranged(ranges)
       Print.vlans(vlans)
       Print.vlan_ranges(vlans)
       puts
     end
-    if table_png_mode
-      Print.table_png(ranges, vlans, table_png_mode, target, interface)
-    elsif table_mode
-      Print.table(ranges, vlans, use_color, target, interface)
+    if @table_png_mode
+      Print.table_png(ranges, vlans, @table_png_mode, @target, interface)
+    elsif @table_mode
+      Print.table(ranges, vlans, @use_color, @target, interface)
     else
-      Print.combined_ranges(ranges, vlans, use_color, target, interface)
+      Print.combined_ranges(ranges, vlans, @use_color, @target, interface)
     end
   end
 
-  # Основна логіка виконання
-  # @return [void]
-  def self.run
+  # Ініціалізує об’єкт FreeRange із параметрами
+  def initialize
+    @config = nil
+    @subscribers_result = nil
+    @target = nil
+    @use_color = false
+    @debug = false
+    @table_mode = false
+    @table_png_mode = nil
+
     options = {}
     OptionParser.new do |opts|
       opts.banner = <<~BANNER
@@ -583,22 +584,22 @@ module FreeRange
       exit 1
     end
 
-    # Визначаємо змінні з опцій
-    use_color = !options[:no_color] && ENV['TERM'] && ENV['TERM'] != 'dumb'
-    debug = options[:debug]
-    table_mode = options[:table]
-    table_png_mode = options[:table_png]
+    # Ініціалізуємо змінні екземпляра
+    @use_color = !options[:no_color] && ENV['TERM'] && ENV['TERM'] != 'dumb'
+    @debug = options[:debug]
+    @table_mode = options[:table]
+    @table_png_mode = options[:table_png]
     interface = options[:interface]
     config_file = options[:config_file]
 
     # Ініціалізуємо config з порожнім login
-    config = Config.new({ target: ARGV[0], username: nil, password: nil })
+    @config = Config.new({ target: ARGV[0], username: nil, password: nil })
 
     # Завантажуємо конфігураційний файл, якщо він вказаний
     if config_file
       begin
         # Виконуємо конфігураційний файл у контексті існуючого об’єкта config
-        config.instance_eval(File.read(config_file), config_file)
+        @config.instance_eval(File.read(config_file), config_file)
       rescue LoadError, Errno::ENOENT
         puts "Помилка: неможливо завантажити конфігураційний файл '#{config_file}'."
         exit 1
@@ -612,8 +613,8 @@ module FreeRange
     end
 
     # Визначаємо username і password з пріоритетом: аргументи > config > ENV
-    username = options[:username] || config.username || ENV['WHOAMI']
-    password = options[:password] || config.password || ENV['WHATISMYPASSWD']
+    username = options[:username] || @config.username || ENV['WHOAMI']
+    password = options[:password] || @config.password || ENV['WHATISMYPASSWD']
 
     if username.nil? || password.nil?
       puts "Помилка: необхідно вказати ім'я користувача та пароль."
@@ -622,41 +623,41 @@ module FreeRange
     end
 
     login = { target: ARGV[0], username: username, password: password }
-    target = ARGV[0].split('.')[0]
+    @target = ARGV[0].split('.')[0]
     puts "Connecting to device: #{login[:target]}"
 
     # Оновлюємо config з актуальними login даними
-    config = Config.new(login) { |c|
-      c.username = config.username if config.username
-      c.password = config.password if config.password
+    @config = Config.new(login) { |c|
+      c.username = @config.username if @config.username
+      c.password = @config.password if @config.password
     }
 
-    if debug
+    if @debug
       puts "[DEBUG] Values:"
-      puts "[DEBUG] use_color: #{use_color}"
-      puts "[DEBUG] table_mode: #{table_mode}"
-      puts "[DEBUG] table_png_mode: #{table_png_mode}"
+      puts "[DEBUG] use_color: #{@use_color}"
+      puts "[DEBUG] table_mode: #{@table_mode}"
+      puts "[DEBUG] table_png_mode: #{@table_png_mode}"
       puts "[DEBUG] interface: #{interface}"
       puts "[DEBUG] ARGV[0]: #{ARGV[0]}"
-      puts "[DEBUG] target: #{target}"
+      puts "[DEBUG] target: #{@target}"
       puts "[DEBUG] login: #{login}"
       puts "[DEBUG] config_file: #{config_file}"
-      puts "[DEBUG] config.username: #{config.username}"
-      puts "[DEBUG] config.password: #{config.password}"
-      puts "[DEBUG] config.ssh_command: #{config.ssh_command}"
-      puts "[DEBUG] config.subscribers_command: #{config.subscribers_command}"
-      puts "[DEBUG] config.command_interfaces: #{config.command_interfaces}"
+      puts "[DEBUG] config.username: #{@config.username}"
+      puts "[DEBUG] config.password: #{@config.password}"
+      puts "[DEBUG] config.ssh_command: #{@config.ssh_command}"
+      puts "[DEBUG] config.subscribers_command: #{@config.subscribers_command}"
+      puts "[DEBUG] config.command_interfaces: #{@config.command_interfaces}"
     end
 
-    subscribers_result = `#{config.subscribers_command}`.strip
-    if subscribers_result.empty?
+    @subscribers_result = `#{@config.subscribers_command}`.strip
+    if @subscribers_result.empty?
       puts "Помилка: результат subscribers_command порожній. Перевір шлях або доступ."
       exit 1
     end
 
     if interface == "all"
-      full_cmd = "#{config.ssh_command} '#{config.command_interfaces}'"
-      puts "[DEBUG] Executing command: #{full_cmd}" if debug
+      full_cmd = "#{@config.ssh_command} '#{@config.command_interfaces}'"
+      puts "[DEBUG] Executing command: #{full_cmd}" if @debug
       result = `#{full_cmd}`.strip
       if result.empty?
         puts "Помилка: результат команди порожній. Перевір підключення або команду."
@@ -670,10 +671,16 @@ module FreeRange
       end
 
       interfaces.each do |intf|
-        process_and_output(config, intf, subscribers_result, target, use_color, debug, table_mode, table_png_mode)
+        process_and_output(intf)
       end
     else
-      process_and_output(config, interface, subscribers_result, target, use_color, debug, table_mode, table_png_mode)
+      process_and_output(interface)
     end
+  end
+
+  # Основна логіка виконання
+  # @return [void]
+  def self.run
+    new
   end
 end
